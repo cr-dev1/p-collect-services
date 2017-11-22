@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:mock="http://www.mulesoft.org/schema/mule/mock" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd">
+    <munit:config mock-connectors="false" mock-inbounds="false" name="munit" doc:name="MUnit configuration"/>
+    <spring:beans>
+        <spring:import resource="classpath:p-collect-services-api.xml"/>
+        <spring:import resource="classpath:p-collect-services-commonflows.xml"/>
+        <spring:import resource="classpath:p-collect-services-error-handling.xml"/>
+        <spring:import resource="classpath:p-collect-services-global-config.xml"/>
+    </spring:beans>
+    <munit:test name="p-collect-services-api-test-suite-p-collect-services-session-verify-main-flowTest" description="Test" >
+        <mock:when messageProcessor=".*:.*" doc:name="Invoke System Comarch Customer GET API">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['Invoke System Comarch Customer GET API']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('response/get_comarch_response.json').asString()])" mimeType="application/json"/>
+        </mock:when>
+        <munit:set payload="#[]" mimeType="application/json" doc:name="Set Message">
+            <munit:inbound-properties>
+                <munit:inbound-property key="Authorization" value="#['Bearer AQECAHiACBgFPsYPLHvnK54qxgBne25IYm1azaJ1e55xlak/LAAAAY8wggGLBgkqhkiG9w0BBwagggF8MIIBeAIBADCCAXEGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMWbvyyQkZptwudZ7sAgEQgIIBQmMi6joJ4YG6x1Rvq1m+1Jyb346vpqhWVyf2Tr3dfI2Hmqi9ynGToDVhRyFTj+Fr9RwJEmT3VFqIl1WkjiGEvmeM4c0TsdELdfVt1o/HtIZ3Ul9IDz8OcFyif4syspxPqAGg5is2nDNahUNIYoud6WYdXYVF9T9aiiiPYN+gdy5MYppQm1YVAXXYCRWS5mNJOp9NGGjIgMq+fMF00cLRkeNeQeaRKn99VzPee5FvfDHvhVuKT2TlIMqjQEeZd5qU2+082MswhAyczE0gYWjEnzln04iDBC1QoF6Drv8XrAngECg6QxXNErmoKNJyKeNnUI22iEsj9qcPFJYgOhW5gCshwa9etxDk58I08sr5LCMCTAj7DFifIUcodOccr9sjHVod+ze0Ov8yfURyZI9+xQDiUC1y9LgxRib2fHTfAP+9J04=']"/>
+                <munit:inbound-property key="X-COSTA-CHANNEL" value="#['M']"/>
+                <munit:inbound-property key="X-COSTA-COUNTRY" value="#['GB']"/>
+                <munit:inbound-property key="X-COSTA-LANG" value="#['en-gb']"/>
+            </munit:inbound-properties>
+        </munit:set>
+        <flow-ref name="p-collect-services-session-verify-main-flow" doc:name="p-collect-services-session-verify-main-flow"/>
+        <munit:assert-on-equals message="The response payload is not correct!" expectedValue="#['abc@gmail.com']" actualValue="#[json:email]" doc:name="Assert Equals"/>
+    </munit:test>
+    <munit:test name="p-collect-services-api-test-suite-p-collect-services-common-authorization-error-sub-flowTest" description="Test">
+        <mock:throw-an exception-ref="#[new org.mule.module.apikit.exception.BadRequestException('Bad Request')]" whenCalling=".*:.*" doc:name="Throw an Exception">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['Check for Authorization header']"/>
+            </mock:with-attributes>
+        </mock:throw-an>
+        <munit:set payload="#[]" mimeType="application/json" doc:name="Set Message">
+            <munit:inbound-properties>
+                <munit:inbound-property key="Authorization" value="#['AQECAHiACBgFPsYPLHvnK54qxgBne25IYm1azaJ1e55xlak/LAAAAY8wggGLBgkqhkiG9w0BBwagggF8MIIBeAIBADCCAXEGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMWbvyyQkZptwudZ7sAgEQgIIBQmMi6joJ4YG6x1Rvq1m+1Jyb346vpqhWVyf2Tr3dfI2Hmqi9ynGToDVhRyFTj+Fr9RwJEmT3VFqIl1WkjiGEvmeM4c0TsdELdfVt1o/HtIZ3Ul9IDz8OcFyif4syspxPqAGg5is2nDNahUNIYoud6WYdXYVF9T9aiiiPYN+gdy5MYppQm1YVAXXYCRWS5mNJOp9NGGjIgMq+fMF00cLRkeNeQeaRKn99VzPee5FvfDHvhVuKT2TlIMqjQEeZd5qU2+082MswhAyczE0gYWjEnzln04iDBC1QoF6Drv8XrAngECg6QxXNErmoKNJyKeNnUI22iEsj9qcPFJYgOhW5gCshwa9etxDk58I08sr5LCMCTAj7DFifIUcodOccr9sjHVod+ze0Ov8yfURyZI9+xQDiUC1y9LgxRib2fHTfAP+9J04=']"/>
+                <munit:inbound-property key="X-COSTA-CHANNEL" value="#['M']"/>
+                <munit:inbound-property key="X-COSTA-COUNTRY" value="#['GB']"/>
+                <munit:inbound-property key="X-COSTA-LANG" value="#['en-gb']"/>
+            </munit:inbound-properties>
+        </munit:set>
+        <flow-ref name="p-collect-services-common-authorization-error-sub-flow" doc:name="Flow-ref to p-collect-services-common-authorization-error-sub-flow"/>
+        <munit:assert-not-null doc:name="Assert Not Null Payload"/>
+    </munit:test>
+</mule>

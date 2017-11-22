@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:secure-property-placeholder="http://www.mulesoft.org/schema/mule/secure-property-placeholder" xmlns:context="http://www.springframework.org/schema/context" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/secure-property-placeholder http://www.mulesoft.org/schema/mule/secure-property-placeholder/current/mule-secure-property-placeholder.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+    <secure-property-placeholder:config name="Secure_Property_Placeholder" key="${auth_enc_key}" location="properties/p-collect-${env}-properties.properties,properties/p-collect-error-properties.properties" doc:name="Secure Property Placeholder"/>
+    <spring:beans>
+        <spring:import resource="classpath:common-logging.xml"/>
+        <spring:import resource="classpath:common-exceptions.xml"/>
+        <spring:import resource="classpath:cl-common-service.xml"/>
+         <spring:bean id="mySqlConfig" name="mySqlConfig"
+			class="org.enhydra.jdbc.standard.StandardXADataSource">
+			<spring:property name="driverName" value="com.mysql.jdbc.Driver" />
+			<spring:property name="url" value="${db_url}" />
+			<spring:property name="user" value="${db_user}" />
+			<spring:property name="password" value="${db_password}" />
+		</spring:bean>
+        <spring:bean id="JWTDecrypt" name="JWTDecrypt" class="com.costa.token.decipher.JWTDeHashMechanism"/>
+    </spring:beans>
+      <http:listener-config name="p-collect-services-api-httpListenerConfig" host="${http.listener.host}" port="${http.listener.port}" doc:name="HTTP Listener Configuration"/>
+    <apikit:config name="p-collect-services-api-config" raml="p-collect-services-api.raml" consoleEnabled="true" doc:name="Router" keepRamlBaseUri="false">
+        <apikit:flow-mapping resource="/session/verify" action="get" flow-ref="p-collect-services-session-verify-main-flow"/>
+    </apikit:config>
+        <http:request-config name="HTTP_KMS_Request_Configuration" host="${kms.http.host}" port="${kms.http.port}" basePath="${kms.http.basepath}" doc:name="HTTP Request Configuration"/>
+      <http:request-config name="HTTP_System_Comarch_Request_Configuration" host="${comarch.api.host}" port="${comarch.api.port}" basePath="${base.api}" doc:name="HTTP Request Configuration"  responseTimeout="30000"/>
+    <queued-asynchronous-processing-strategy name="Queued_Asynchronous_Processing_Strategy" doc:name="Queued Asynchronous Processing Strategy">
+        <default-in-memory-queue-store/>
+    </queued-asynchronous-processing-strategy>
+    
+      <db:mysql-config name="MySQL_Configuration" dataSource-ref="mySqlConfig" doc:name="MySQL Configuration"/>
+  
+</mule>

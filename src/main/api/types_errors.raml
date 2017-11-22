@@ -1,0 +1,34 @@
+#%RAML 1.0 Library
+usage:
+   library for errors
+   
+types:
+  errorResponse:
+    description: ErrorResponse type
+    type: object
+    properties:
+      transactionId:
+        description: transactionId of the request that failed
+        type: string
+        required: false
+      exceptionCode:
+        description: code associated with the error/exception
+        type: string
+      timeStamp:
+        description: timestamp at which the error occurred
+        type: string
+      message:
+        description: message associated with the error/exception
+        type: string
+      reason:
+        description: description of the error/exception
+        type: string
+      details:
+        type: array
+        items:
+          type: object
+          properties: 
+            referenceId:
+              description: referenceId to be used for additional purposes
+              type: string
+              required: false

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+    <flow name="p-collect-services-api-main">
+        <http:listener config-ref="p-collect-services-api-httpListenerConfig" path="/api/*" doc:name="HTTP"/>
+        <set-variable variableName="transactionId" value="#[java.util.UUID.randomUUID().toString()]" doc:name="Set TransactionId"/>
+        <apikit:router config-ref="p-collect-services-api-config" doc:name="APIkit Router"/>
+        <exception-strategy ref="p-collect-services-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <flow name="p-collect-services-api-console">
+        <http:listener config-ref="p-collect-services-api-httpListenerConfig" path="/console/*" doc:name="HTTP"/>
+        <choice doc:name="Choice">
+            <when expression="${console_enabled}">
+                <apikit:console config-ref="p-collect-services-api-config" doc:name="APIkit Console"/>
+            </when>
+            <otherwise>
+                <set-payload value="Resource not found" doc:name="Set Payload"/>
+            </otherwise>
+        </choice>
+
+    </flow>
+    <flow name="p-collect-services-session-verify-main-flow">
+        <flow-ref name="p-collect-api-services-entry-logging-audit-sub-flow" doc:name="p-collect-api-services-entry-logging-audit-sub-flow"/>
+        <message-filter onUnaccepted="p-collect-services-common-authorization-error-sub-flow" doc:name="Check for Authorization header">
+            <expression-filter expression="#[message.inboundProperties.authorization != null &amp;&amp; message.inboundProperties.authorization != &quot;&quot; &amp;&amp; (message.inboundProperties.authorization.contains(&quot;Bearer&quot;) || message.inboundProperties.authorization.contains(&quot;bearer&quot;)) &amp;&amp; message.inboundProperties.authorization.split(&quot; &quot;).size() ==2]"/>
+        </message-filter>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="kmsUrl" value="${kms_inscribe_url}"/>
+            <add-message-property key="kmsdecryptUrl" value="${kms_unravel_url}"/>
+            <add-message-property key="kmsQueryParams" value="${kms_query_params}"/>
+            <add-message-property key="kmsContentType" value="${kms_header_content_type}"/>
+            <add-message-property key="kmsHeaderSystem" value="${kms_header_system}"/>
+            <add-message-property key="kmsHeaderLanguage" value="${kms_header_language}"/>
+            <add-message-property key="kmsRequestMethod" value="${kms_request_method}"/>
+            <add-message-property key="authorization" value="#[(message.inboundProperties.authorization  != null &amp;&amp; message.inboundProperties.authorization != {}) ? message.inboundProperties.authorization.split(&quot; &quot;)[1] : &quot;&quot;]"/>
+            <add-message-property key="lang" value="#[message.inboundProperties.'X-COSTA-LANG']"/>
+            <add-message-property key="country" value="#[message.inboundProperties.'X-COSTA-COUNTRY']"/>
+            <add-message-property key="channel" value="#[message.inboundProperties.'X-COSTA-CHANNEL']"/>
+        </message-properties-transformer>
+<!--           <flow-ref name="kms-decryption-of-authorization-token-api-flow" doc:name="kms-decryption-of-authorization-token-api-flow"/>
+ -->          <flow-ref name="dm-user-authenticate-flow" doc:name="dm-user-authenticate-flow"/>
+        <flow-ref name="p-collect-api-services-calling-logging-audit-sub-flow" doc:name="p-collect-api-services-calling-logging-audit-sub-flow"/>
+        <http:request config-ref="HTTP_System_Comarch_Request_Configuration" path="/customer" method="GET" doc:name="Invoke System Comarch Customer GET API">
+            <http:request-builder>
+                <http:header headerName="X-COSTA-COUNTRY" value="#[flowVars.country]"/>
+                <http:header headerName="X-COSTA-LANG" value="#[flowVars.lang]"/>
+                <http:header headerName="X-COSTA-CHANNEL" value="#[flowVars.channel]"/>
+                <http:header headerName="Authorization" value="#[flowVars.vAuthorization]"/>
+                <http:header headerName="X-COSTA-TRANSACTION-ID" value="#[flowVars.transactionId]"/>
+                <http:header headerName="X-COSTA-REQUEST-ID" value="#[flowVars.vRequestId]"/>
+            </http:request-builder>
+        </http:request>
+        <flow-ref name="p-collect-api-services-called-logging-audit-sub-flow" doc:name="p-collect-api-services-called-logging-audit-sub-flow"/>
+        <json:json-to-object-transformer returnClass="java.util.Map" doc:name="JSON to Object (Map)"/>
+        <expression-component doc:name="Store customer details"><![CDATA[flowVars.email = payload.email;
+flowVars.customerFirstName = payload.firstName;
+flowVars.customerLastName = payload.lastName;
+flowVars.customerID=payload.cus_id
+flowVars.index=0;
+if(payload.identifiers!=null){
+	flowVars.loopSize=payload.identifiers.size();
+}else{
+	flowVars.loopSize=0;
+}
+for(index=0; index<flowVars.loopSize;index++)
+{
+	if(payload.identifiers[index].type.code.equals("CP"))
+	{
+		flowVars.customerCardNo = payload.identifiers[index].no;
+		flowVars.loopSize=index;
+	}
+}
+
+
+]]></expression-component>
+        <dw:transform-message doc:name="Response Payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  "email": flowVars.email,
+  "customerID":flowVars.customerID,
+  "firstName": flowVars.customerFirstName,
+  "lastName": flowVars.customerLastName,
+  "cpCardNumber": flowVars.customerCardNo
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <flow-ref name="p-collect-api-services-exit-logging-audit-sub-flow" doc:name="p-collect-api-services-exit-logging-audit-sub-flow"/>
+        <exception-strategy ref="p-collect-services-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+
+    
+</mule>

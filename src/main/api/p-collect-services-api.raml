@@ -1,0 +1,77 @@
+#%RAML 1.0
+baseUri: https://cl-api-services-d.eu.cloudhub.io/v1
+version: 1.0
+title: Collect API
+protocols: [HTTP,HTTPS]
+
+mediaType: application/json
+
+uses:
+ customer-details-types: types_customer_details.raml
+ error-types: types_errors.raml
+ 
+traits:   
+  api-headers-required:
+         headers:
+          X-COSTA-LANG:
+              description: Header field defined to pass the language. 
+              required: true
+              minLength: 1
+              enum: 
+                - 'en-gb'
+          X-COSTA-COUNTRY:
+              description: Header field defined to pass the country. 
+              required: true
+              minLength: 1
+              enum: 
+                - 'GB'
+          X-COSTA-CHANNEL:
+              description: Header field defined to pass the channel. Enum of ['M, 'W', 'P'] for Mobile, Web and POS systems.
+              required: true
+              minLength: 1
+              enum: 
+                - 'M'
+                - 'W'
+                - 'P'
+          X-COSTA-ORGANISATION:
+           type: string
+           description: Header field defined to pass the additional organisation detail. Eg:Costa
+           required: false
+          X-COSTA-EXT-CORRELATION-ID:
+           description: Header field defined to pass the external consumer correlation ID. Eg:c7277ca4-6922-472b-98e0-bdb44cb1dc21
+           type: string
+           required: false
+
+  auth-header-required:
+         headers:
+          Authorization:
+              description: Token of the user to be validated.
+              type: string
+              required: true
+              minLength: 1
+                       
+ 
+/session:
+  displayName: Auth Verification API
+  /verify:
+   get:
+    description: used to validate the user token in the input and retrieve the details.
+    is: [api-headers-required,auth-header-required]
+    responses: 
+      200:
+        body: 
+          application/json:
+            type: customer-details-types.getcustomerDetailsResponse
+            example: !include examples/getCustomerDetailsResponse.json 
+      400:
+        description: The error structure for any 400 error. The referenceID provided is for future use.
+        body:
+          application/json:
+            type: error-types.errorResponse
+            example: !include examples/400ErrorResponse.json
+      500:
+        description: The error structure for any 500 error. The referenceID provided is for future use.
+        body: 
+          application/json:
+            type: error-types.errorResponse
+            example: !include examples/500ErrorResponse.json

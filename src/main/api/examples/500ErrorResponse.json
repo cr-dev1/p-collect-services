@@ -1,0 +1,12 @@
+{
+        "transactionId":"23e40985-451a-4e4f-b605-5ce7a8d181bf",
+        "exceptionCode":"INT-313",
+        "timeStamp":"2012-04-23T18:25:43.511Z",
+        "message":"HTTP Version Not Supported",
+        "reason":"The HTTP Version provided is not supported",
+        "details":[
+            {
+                "referenceId":""
+            }
+        ]
+}

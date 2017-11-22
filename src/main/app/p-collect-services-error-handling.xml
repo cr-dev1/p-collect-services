@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+       <choice-exception-strategy  name="p-collect-services-Exception-Strategy">
+  <catch-exception-strategy when="#[exception.causedBy(org.mule.module.apikit.exception.BadRequestException)]" doc:name="Caused By (org.mule.module.apikit.exception.BadRequestException)">
+            <set-property propertyName="http.status" value="#[400]" doc:name="Set http status"/>
+            <set-variable variableName="reason" value="#[exception.getCause().getMessage()]" doc:name="Variable"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%var errorMessage = "${bad_request}" splitBy ","
+%output application/json
+---
+{
+    "exception": {
+        "transactionId": flowVars.transactionId,
+        "exceptionCode": errorMessage[0],
+        "timeStamp": now as :string { format: "yyyy-MM-dd'T'HH:mm:ssZ" },
+        "message": errorMessage[1],
+        "reason": flowVars.reason
+    }
+}  
+]]></dw:set-payload>
+            </dw:transform-message>
+
+        </catch-exception-strategy>
+    <catch-exception-strategy doc:name="causedBy(org.mule.module.http.internal.request.ResponseValidatorException)" when="#[exception.causedBy(org.mule.module.http.internal.request.ResponseValidatorException)]">
+            <choice doc:name="Choice">
+                <when expression="#[message.inboundProperties['http.status'] &lt;=499]">
+                    <set-payload value="#[message.payloadAs(java.lang.String)]" mimeType="application/json" doc:name="Set Payload"/>
+                    <choice doc:name="Choice">
+                        <when expression="#[json:errors!=null]">
+                            <dw:transform-message doc:name="Transform Message">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var collectCodes = "${collect_codes}" splitBy ","
+%var apiCodes = "${api_codes}" splitBy ","
+%var error = payload.errors[0].code
+%var index = (apiCodes find error) reduce $$
+
+---
+{
+	 "exception": {
+        "transactionId": flowVars.transactionId,
+        "exceptionCode": collectCodes[index],
+        "timeStamp": now as :string { format: "yyyy-MM-dd'T'HH:mm:ssZ" },
+        "message": payload.errors[0].title,
+        "reason": payload.errors[0].details when payload.errors[0].details !=null otherwise payload.errors[0].detail
+    } 
+}]]></dw:set-payload>
+                            </dw:transform-message>
+                        </when>
+                        <otherwise>
+                            <logger message="Error mapped from the invoked API" level="INFO" doc:name="Logger"/>
+                        </otherwise>
+                    </choice>
+                    <set-property propertyName="#['http.status']" value="#[message.inboundProperties.'http.status']" doc:name="Set http status"/>
+                </when>
+                <otherwise>
+                    <set-property propertyName="#['http.status']" value="#[message.inboundProperties.'http.status']" doc:name="Set http status"/>
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var collectCodes = "${collect_codes}" splitBy ","
+%var apiCodes = "${api_codes}" splitBy ","
+%var error = payload.errors[0].code
+%var index = (apiCodes find error) reduce $$
+
+---
+{
+	 "exception": {
+        "transactionId": flowVars.transactionId,
+        "exceptionCode": collectCodes[index],
+        "timeStamp": now as :string { format: "yyyy-MM-dd'T'HH:mm:ssZ" },
+        "message": payload.errors[0].title,
+        "reason": payload.errors[0].details when payload.errors[0].details !=null otherwise payload.errors[0].detail
+    } 
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                </otherwise>
+            </choice>
+
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.module.apikit.exception.NotFoundException)]" doc:name="Caused By (org.mule.module.apikit.exception.NotFoundException)">
+            <set-property propertyName="http.status" value="#[404]" doc:name="Set http status"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%var errorMessage = "${resource_Not_Found}" splitBy ","
+%output application/json
+---
+{
+    "exception": {
+        "transactionId": flowVars.transactionId,
+        "exceptionCode": errorMessage[0],
+        "timeStamp": now as :string { format: "yyyy-MM-dd'T'HH:mm:ssZ" },
+        "message": errorMessage[1],
+        "reason": errorMessage[2]
+    }
+}  
+]]></dw:set-payload>
+            </dw:transform-message>
+
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.module.apikit.exception.MethodNotAllowedException)]" doc:name="Caused By (org.mule.module.apikit.exception.MethodNotAllowedException)">
+            <set-property propertyName="http.status" value="#[405]" doc:name="Set http status"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%var errorMessage = "${invalid_method_type}" splitBy ","
+%output application/json
+---
+{
+    "exception": {
+        "transactionId": flowVars.transactionId,
+        "exceptionCode": errorMessage[0],
+        "timeStamp": now as :string { format: "yyyy-MM-dd'T'HH:mm:ssZ" },
+        "message": errorMessage[1],
+        "reason": errorMessage[2]
+    }
+}  
+]]></dw:set-payload>
+            </dw:transform-message>
+
+        </catch-exception-strategy>
+                     <catch-exception-strategy when="#[exception.causedBy(java.util.concurrent.TimeoutException)]" doc:name="Caused By (java.util.concurrent.TimeoutException)">
+
+            <set-property propertyName="http.status" value="#[500]" doc:name="Set http status"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%var errorMessage = "${processing_error}" splitBy ","
+%output application/json
+---
+{
+    "exception": {
+        "transactionId": flowVars.transactionId,
+        "exceptionCode": errorMessage[0],
+        "timeStamp": now as :string { format: "yyyy-MM-dd'T'HH:mm:ssZ" },
+        "message": errorMessage[1],
+        "reason": errorMessage[2]
+    }
+}  ]]></dw:set-payload>
+            </dw:transform-message>
+        </catch-exception-strategy>
+         <catch-exception-strategy when="#[exception.causedBy(java.io.IOException)]" doc:name="Caused By (com.costa.token.decipher.JWTDeHashMechanism)">
+
+            <set-property propertyName="http.status" value="#[401]" doc:name="Set http status"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%var errorMessage = "${invalid_authorization}" splitBy ","
+%output application/json
+---
+{
+    "exception": {
+        "transactionId": flowVars.transactionId,
+        "exceptionCode": errorMessage[0],
+        "timeStamp": now as :string { format: "yyyy-MM-dd'T'HH:mm:ssZ" },
+        "message": errorMessage[1],
+        "reason": errorMessage[2]
+    }
+}  
+]]></dw:set-payload>
+            </dw:transform-message>
+
+        </catch-exception-strategy>
+    </choice-exception-strategy>
+    
+     <sub-flow name="p-collect-services-common-authorization-error-sub-flow">
+        <set-property propertyName="http.status" value="#[401]" doc:name="Set http status"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%var errorMessage = "${invalid_authorization}" splitBy ","
+%output application/json
+---
+{
+    "exception": {
+        "transactionId": flowVars.transactionId,
+        "exceptionCode": errorMessage[0],
+        "timeStamp": now as :string { format: "yyyy-MM-dd'T'HH:mm:ssZ" },
+        "message": errorMessage[1],
+        "reason": errorMessage[2]
+    }
+}  
+]]></dw:set-payload>
+        </dw:transform-message>
+    </sub-flow>
+
+</mule>

@@ -1,0 +1,40 @@
+#%RAML 1.0 Library
+usage:
+   library for customer details
+   
+types:
+  getcustomerDetailsResponse:
+    description: GetCustomerDetailsResponse type
+    type: object
+    properties:
+        firstName:
+          description: first name of the customer
+          type: string
+          required: true
+          minLength: 1
+        middleName:
+          description: middle name of the customer
+          type: string
+          required: false
+          minLength: 1
+        lastName:
+          description: last name of the customer
+          type: string
+          required: true
+          minLength: 1
+        emailAddress:
+          description: email address of the customer
+          type: string
+          required: true
+          minLength: 1
+        customerGUID:
+          description: GUID of the customer
+          type: string
+          required: true
+          minLength: 1
+        cpCardNumber:
+          description: Price of the product in a rail store
+          type: string
+          required: true
+          minLength: 1
+        

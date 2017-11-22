@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+   <!-- <sub-flow name="kms-decryption-of-authorization-token-api-flow">
+		<dw:transform-message doc:name="Prepare request to call KMS API">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+
+{
+   cipherText:flowVars.authorization
+}]]></dw:set-payload>
+		</dw:transform-message>
+        <flow-ref name="p-collect-api-services-calling-logging-audit-sub-flow" doc:name="p-collect-api-services-calling-logging-audit-sub-flow"/>
+
+		<http:request config-ref="HTTP_KMS_Request_Configuration"
+			path="${kms.http.unravel.path}" method="POST" doc:name="HTTP - Call KMS Unravel API">
+			<http:request-builder>
+				<http:query-param paramName="client_id" value="${kms.client_id}" />
+				<http:query-param paramName="client_secret" value="${kms.client_secret}" />
+				<http:header headerName="System" value="${kms.system}" />
+				<http:header headerName="Language" value="${kms.language}" />
+				<http:header headerName="Content-Type" value="application/json" />
+			</http:request-builder>
+		</http:request>
+		
+        <flow-ref name="p-collect-api-services-called-logging-audit-sub-flow" doc:name="p-collect-api-services-called-logging-audit-sub-flow"/>
+
+        <dw:transform-message doc:name="Retrieve plain text">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+payload.plainText]]></dw:set-payload>
+            <dw:set-variable variableName="encToken"><![CDATA[%dw 1.0
+%output application/java
+
+payload.cipherText]]></dw:set-variable>
+        </dw:transform-message>
+
+	</sub-flow>
+	 -->
+	
+		
+		 <sub-flow name="dm-user-authenticate-flow">
+        <set-variable variableName="userToken" value="#[flowVars.authorization]" doc:name="Authorization Token"/>
+
+          
+      
+        <invoke name="InvokeJWTDecryptAccount" object-ref="JWTDecrypt" method="dehashUserToken" methodArguments="#[flowVars.userToken],${jwt_shared_key},${aes_shared_key},#[flowVars]"  />
+        <expression-component doc:name="Store Authorization token"><![CDATA[flowVars.vAuthorization='Bearer ' + payload.access_token;
+]]></expression-component>
+       
+    </sub-flow>
+
+<sub-flow name="p-collect-api-services-entry-logging-audit-sub-flow">
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="vFlowName" value="#[context:serviceName]"/>
+            <add-message-property key="vRequestId" value="#[java.util.UUID.randomUUID().toString()]"/>
+            <add-message-property key="vMessageId" value="#[message.rootId]"/>
+            <add-message-property key="vCorrelationId" value="#[flowVars.transactionId]"/>
+        </message-properties-transformer>
+        <set-payload value="#[message.payloadAs(java.lang.String)]" mimeType="application/json" doc:name="Auto transform stream to serializable payload"/>
+        <async doc:name="Async">
+            <flow-ref name="entry-logger-flow" doc:name="entry-logger-flow"/>
+        </async>
+      <async processingStrategy="Queued_Asynchronous_Processing_Strategy" doc:name="Async">
+            <flow-ref name="common-logger-audit-entry-Sub_Flow" doc:name="common-logger-audit-entry-Sub_Flow"/>
+        </async>
+    </sub-flow>
+    <sub-flow name="p-collect-api-services-exit-logging-audit-sub-flow">
+        <async doc:name="Async">
+            <flow-ref name="call-exit-logger-flow" doc:name="call-exit-logger-flow"/>
+        </async>
+        <async processingStrategy="Queued_Asynchronous_Processing_Strategy" doc:name="Async">
+            <flow-ref name="common-logger-audit-exit-Sub_Flow" doc:name="common-logger-audit-exit-Sub_Flow"/>
+        </async>
+    </sub-flow>
+        <sub-flow name="p-collect-api-services-error-logging-audit-sub-flow">
+        <async doc:name="Async">
+            <flow-ref name="error-logger-flow" doc:name="error-logger-flow"/>
+        </async>
+       <async processingStrategy="Queued_Asynchronous_Processing_Strategy" doc:name="Async">
+            <flow-ref name="common-logger-audit-error-sub-flow" doc:name="common-logger-audit-error-sub-flow"/>
+        </async>
+    </sub-flow>
+    <sub-flow name="p-collect-api-services-calling-logging-audit-sub-flow">
+        <async processingStrategy="Queued_Asynchronous_Processing_Strategy" doc:name="Async">
+            <flow-ref name="call-entry-logger-flow" doc:name="call-entry-logger-flow"/>
+        </async>
+        <async processingStrategy="Queued_Asynchronous_Processing_Strategy" doc:name="Async">
+            <flow-ref name="common-logger-audit-calling-Sub_Flow" doc:name="common-logger-audit-calling-Sub_Flow"/>
+        </async>
+    </sub-flow>
+    <sub-flow name="p-collect-api-services-called-logging-audit-sub-flow">
+        <set-payload value="#[message.payloadAs(java.lang.String)]" mimeType="application/json" doc:name="Auto transform stream to serializable payload"/>
+        <async processingStrategy="Queued_Asynchronous_Processing_Strategy" doc:name="Async">
+            <flow-ref name="call-exit-logger-flow" doc:name="call-exit-logger-flow"/>
+        </async>
+        <async processingStrategy="Queued_Asynchronous_Processing_Strategy" doc:name="Async">
+            <flow-ref name="common-logger-audit-called-Sub_Flow" doc:name="common-logger-audit-called-Sub_Flow"/>
+        </async>
+    </sub-flow>
+
+</mule>
